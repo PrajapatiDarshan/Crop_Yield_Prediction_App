@@ -1,219 +1,252 @@
-# 🌾 Agricultural Crop-Yield Prediction — ML Capstone Project
+# 🌾 CropIQ: Indian District-Wise Crop Yield Analytics & Prediction
 
-Predicting district-level crop yield across India to help agricultural planners identify
-high- and low-productivity districts before the season's outcome is known.
+An end-to-end Machine Learning and Data Science solution to predict district-level crop yield based on location, crop, season, and cultivated area. This project features a full machine learning lifecycle—from data collection and preprocessing to model comparison, hyperparameter tuning, validation, feature-importance interpretation, and deployment readiness through an interactive Streamlit dashboard.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
-
-📄 **Project Report:** [`deliverables/report.pdf`](deliverables/report.pdf)
-📊 **Presentation:** [`deliverables/CropYieldPrediction_Presentation.pptx`](deliverables/CropYieldPrediction_Presentation.pptx)
-🌐 **Live Demo:** not yet deployed — see [`DEPLOYMENT.md`](DEPLOYMENT.md) for a 2-minute
-Streamlit Community Cloud deploy guide (requires your own GitHub + Streamlit Cloud login,
-so it isn't something that can be generated for you automatically).
+**👉 Try the Live Demo:** [CropIQ Streamlit App](https://cropyieldpredictionapp-2020.streamlit.app/)
 
 ---
 
-## 1. Business Problem
+## 📋 Table of Contents
+1. [Business Problem & Use Case](#-business-problem--use-case)
+2. [Dataset Source & Description](#-dataset-source--description)
+3. [Data Quality Assessment & Preprocessing](#️-data-quality-assessment--preprocessing)
+4. [Exploratory Data Analysis (EDA) Insights](#-exploratory-data-analysis-eda-insights)
+5. [Feature Engineering & Pipeline Design](#️-feature-engineering--pipeline-design)
+6. [Machine Learning Models Tested](#-machine-learning-models-tested)
+7. [Hyperparameter Tuning Approach](#-hyperparameter-tuning-approach)
+8. [Final Model Performance & Evaluation](#-final-model-performance--evaluation)
+9. [Streamlit Dashboard Demo](#️-streamlit-dashboard-demo)[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://cropyieldpredictionapp-2020.streamlit.app/)
+10. [Business Interpretation & Recommendations](#-business-interpretation--recommendations)
+11. [Model Limitations & Responsible AI](#️-model-limitations--responsible-ai)
+12. [Installation & Execution Instructions](#-installation--execution-instructions)
 
-| | |
-|---|---|
-| **ML Task** | Regression |
-| **Target** | `Yield = Production ÷ Area` |
-| **Target users** | State/district agriculture departments, crop insurance providers, agri-input companies, farmer-advisory services |
-| **Expected outcome** | A district × crop × season yield estimate that flags likely under-performing regions early |
-| **Business value** | Better-targeted subsidies, early-warning for low-yield districts, evidence-based crop planning |
+---
 
-**Important constraint honoured throughout this project:** `Production` is **never** used as a
-model input, because it is the quantity used to derive the target itself — using it would leak
-the answer directly into the features.
+## 💼 Business Problem & Use Case
 
-## 2. Dataset
+### The Problem
+Crop yield varies widely across India's districts, crops, and growing seasons, making it difficult for planners to know in advance which regions are likely to under- or over-perform in a given season. For agriculture departments, insurers, and input suppliers, an early, data-driven estimate of expected yield — computed *before* the harvest outcome is known — is critical for timely intervention.
 
-- **Source:** District-wise, Season-wise Crop Production Statistics, Government of India Open
-  Data Platform.
-- **Size:** 49,784 rows → 49,170 after cleaning · 7 states · 112 districts · 80 crops · 1997–2014.
-- **Raw columns:** `State_Name, District_Name, Crop_Year, Season, Crop, Area, Production, Yield`
-- No personally identifiable or sensitive information is present.
+### Target Users & Stakeholders
+* **State & District Agriculture Departments**: Plan subsidies, credit access, and irrigation support ahead of the season rather than reacting after a poor harvest.
+* **Crop Insurance Providers**: Assess regional risk and set more accurate premiums using historical district-crop-season performance.
+* **Agri-Input Companies (seed, fertilizer)**: Plan distribution and inventory toward the districts and crops most likely to need support.
+* **Farmer-Facing Advisory Services**: Surface expected yield benchmarks for a farmer's district, crop, and season.
 
-## 3. Project Structure
+### Expected Business Value
+1. **Early-Warning for Low-Yield Districts**: Flag likely under-performing district-crop-season combinations before the season concludes, enabling proactive intervention.
+2. **Evidence-Based Crop Planning**: Replace guesswork with a quantified, historically grounded yield estimate for planning decisions.
+3. **Equitable Resource Allocation**: Support both business value (insurers, input suppliers) and social value (fair subsidy targeting to under-performing districts).
 
+---
+
+## 📊 Dataset Source & Description
+
+* **Dataset Source**: District-wise, Season-wise Crop Production Statistics, [Government of India Open Data Platform](https://data.gov.in/).
+* **Dataset Size**: 49,784 raw records, 8 columns, spanning 1997–2014.
+* **Data Variables**:
+  * `State_Name`: State in India (categorical).
+  * `District_Name`: District within the state (categorical, 112 unique districts).
+  * `Crop_Year`: Agricultural year of the record (numerical, 1997–2014).
+  * `Season`: Growing season (categorical — Kharif, Rabi, Whole Year, Autumn, Summer, Winter).
+  * `Crop`: Crop grown (categorical, 80 unique crops).
+  * `Area`: Cultivated area in hectares (numerical).
+  * `Production`: Total production in tonnes (numerical) — **used only to derive the target, never as a model input**.
+  * `Yield`: Target variable, engineered as `Production ÷ Area` (numerical, tonnes/hectare-equivalent).
+
+> ⚠️ **Critical modeling constraint**: `Production` is the quantity used to derive the target itself. Feeding it into the model as an input would leak the answer directly into the features, so it is excluded from the feature set entirely — the target is recomputed from first principles instead of trusting the source `Yield` column.
+
+---
+
+## ⚙️ Data Quality Assessment & Preprocessing
+
+* **Missing Value Analysis**: A thorough audit found **zero missing values** in the raw dataset across all 8 columns.
+* **Duplicate Record Removal**: **Zero duplicate records** were found in the raw data (confirmed via `.duplicated()` audit).
+* **Invalid Record Removal**: 109 records with zero or negative `Production`/`Area` were removed, since a yield cannot be computed from them.
+* **Outlier Detection & Treatment**: Outliers were identified using per-crop IQR boxplots — yield scale varies hugely across crop types (e.g. sugarcane vs. pulses), so a single global threshold would wrongly flag entire high-yield crops as outliers. A **±3×IQR cap computed separately per crop** was applied instead, removing 1.23% of rows in total.
+* **Target Recomputation**: `Yield = Production ÷ Area`, calculated fresh from the raw columns rather than trusted from the dataset's own `Yield` field.
+* **Leakage Column Removal**: `Production` and the source `Yield` column were dropped entirely from the modeling feature set.
+* **Preprocessing Pipeline**: To prevent data leakage:
+  * Numerical pipelines scale features using `StandardScaler`.
+  * Categorical pipelines encode high-cardinality features using `OneHotEncoder` with `handle_unknown='ignore'`.
+  * All preprocessing statistics are fit **only on the training partition**, inside an `sklearn Pipeline` + `ColumnTransformer`.
+
+---
+
+## 🔍 Exploratory Data Analysis (EDA) Insights
+
+1. **Target Distribution**: Yield is heavily right-skewed; a log(1+Yield) transform approximates normality, informing the preference for tree-based models that don't assume normality.
+2. **Correlation Heatmap**: `Historical_Yield` and `Historical_Yield_Avg3` (engineered lag features) share a strong positive correlation with the target (`r ≈ 0.90` and `r ≈ 0.88` respectively). Raw cultivated `Area` shows almost no linear relationship with yield (`r ≈ -0.01`) — efficiency, not scale, drives yield.
+3. **Yield Trend Over Years**: Average yield (1997–2014) is relatively stable year-to-year, with no strong long-term drift.
+4. **State & Season Profile**: Andhra Pradesh and Andaman & Nicobar Islands show the highest average yields, partly influenced by crops recorded in non-tonne units (see limitations below). Season-wise, "Whole Year" crops show elevated averages for the same reason.
+
+---
+
+## 🛠️ Feature Engineering & Pipeline Design
+
+Historical performance was engineered as the primary predictive signal, computed strictly from **past years only** to avoid leakage, plus structural and trend features:
+
+* `Historical_Yield` — lag-1 yield for the same State + District + Crop + Season combination.
+* `Historical_Yield_Avg3` — trailing 3-year average yield for the same combination.
+* `Area_log` — `log(1+Area)`, taming the heavy right-skew in cultivated area.
+* `Years_Since_Start` — a linear year-trend feature.
+
+Missing history (~11% of rows, the first year a combination appears) is filled using **training-set-only** crop averages, computed *after* the train/test split, so no future information leaks backward into earlier predictions.
+
+A machine learning `ColumnTransformer` pipeline runs preprocessing steps dynamically. Preprocessing parameters are fitted **only on the training partition** to prevent target leakage.
+
+```python
+preprocessor = ColumnTransformer(
+    transformers=[
+        ("num", Pipeline(steps=[
+            ("scaler", StandardScaler())
+        ]), numeric_features),   # Area_log, Historical_Yield, Historical_Yield_Avg3, Years_Since_Start
+        ("cat", Pipeline(steps=[
+            ("onehot", OneHotEncoder(handle_unknown="ignore"))
+        ]), categorical_features)  # State_Name, District_Name, Crop, Season
+    ]
+)
 ```
-crop_yield_project/
-├── data/
-│   ├── raw/crop_yield_dataset.csv          # original dataset
-│   └── processed/                          # cleaned + feature-engineered data, train/test splits
-├── notebooks/
-│   └── Crop_Yield_Capstone.ipynb           # full, already-executed end-to-end notebook
-├── src/
-│   ├── preprocessing.py                    # cleaning, target creation, outlier treatment
-│   ├── feature_engineering.py              # historical-yield lag features, leakage-safe fill
-│   ├── eda.py                              # exploratory data analysis + figures
-│   ├── train_models.py                     # 10-model training & comparison (time-based split)
-│   ├── hyperparameter_tuning.py            # RandomizedSearchCV tuning of top 2 models
-│   ├── evaluate_and_interpret.py           # actual-vs-predicted, residuals, feature importance,
-│   │                                         district ranking, responsible-AI bias check
-│   └── run_pipeline.py                     # runs all of the above end-to-end, in order
-├── dashboard/
-│   └── app.py                              # interactive Streamlit dashboard
-├── deliverables/
-│   ├── report.pdf                          # written project report
-│   └── CropYieldPrediction_Presentation.pptx  # slide deck
-├── DEPLOYMENT.md                           # how to get a live Streamlit Cloud URL
-├── models/
-│   ├── best_model.pkl                      # final trained pipeline (preprocessing + model)
-│   ├── all_models.pkl                      # every trained model, for comparison/audit
-│   ├── best_model_name.json
-│   └── tuning_params.json
-├── reports/
-│   ├── figures/                            # all EDA + evaluation charts (PNG)
-│   ├── model_comparison.csv
-│   ├── tuned_model_comparison.csv
-│   ├── test_predictions.csv
-│   ├── district_productivity_ranking.csv
-│   ├── feature_importance.csv
-│   ├── error_by_state.csv
-│   └── sample_predictions.csv
-├── requirements.txt
-└── README.md
-```
 
-## 4. Methodology Summary
+---
 
-### Preprocessing (`src/preprocessing.py`)
-- Data-type correction, duplicate removal, invalid-record removal (Area ≤ 0, Production < 0)
-- Target recomputed as `Production / Area`
-- **Per-crop IQR outlier treatment** (×3 IQR) — bounds computed per crop since yield scale
-  varies hugely by crop type (e.g. sugarcane vs. pulses)
-- `Production` and the source `Yield` column dropped to prevent leakage
+## 🤖 Machine Learning Models Tested
 
-### Feature Engineering (`src/feature_engineering.py`)
-- `Historical_Yield` — lag-1 yield for the same State+District+Crop+Season combination
-- `Historical_Yield_Avg3` — trailing 3-year average yield for the same combination
-- `Area_log`, `Years_Since_Start`
-- Missing history (first occurrence of a combination, ~11% of rows) filled with
-  **training-set-only** crop averages, applied after the split, to avoid leakage
+We benchmarked **10 different algorithms** on a chronological, time-based split (train: years < 2012, test: 2012–2014) — not a random split, since a lag feature (`Historical_Yield`) is involved:
 
-### Validation Strategy
-- **Time-based split**: train on years < 2012, test on 2012–2014 (~81% / 19%) — chosen over a
-  random split because `Historical_Yield` is a lag feature and the data has a temporal axis.
-- Preprocessing (scaling, one-hot encoding) fit **only** on the training fold via an
-  sklearn `Pipeline` + `ColumnTransformer`.
-- 3-fold cross-validation on the training set for a stability check alongside the test score.
+1. **Linear Regression** (Baseline)
+2. **Ridge Regression**
+3. **Lasso Regression**
+4. **Decision Tree Regressor**
+5. **Random Forest Regressor** (Ensemble)
+6. **Gradient Boosting Regressor** (Boosting)
+7. **AdaBoost Regressor** (Boosting)
+8. **XGBoost Regressor** (Boosting)
+9. **LightGBM Regressor** (Boosting)
+10. **K-Nearest Neighbours Regressor**
 
-### Models Compared (10 total)
+| Model | Test R² | Test RMSE | Test MAE |
+|---|---|---|---|
+| **LightGBM (final)** | **0.855** | **384.2** | 30.6 |
+| Random Forest | 0.854 | 385.0 | 25.2 |
+| Gradient Boosting | 0.834 | 410.0 | 29.6 |
+| XGBoost | 0.799 | 451.7 | 41.3 |
+| Decision Tree | 0.776 | 477.1 | 39.4 |
+| Ridge Regression | 0.749 | 505.2 | 61.2 |
+| Lasso Regression | 0.748 | 506.2 | 60.6 |
+| Linear Regression | 0.747 | 506.4 | 61.5 |
+| K-Nearest Neighbours | 0.742 | 511.5 | 42.9 |
+| AdaBoost | 0.498 | 714.1 | 237.7 |
 
-| Model | Test R² | Test RMSE | Test MAE | CV R² |
-|---|---|---|---|---|
-| **LightGBM (final)** | **0.855** | **384.2** | 30.6 | 0.861 ± 0.032 |
-| Random Forest | 0.854 | 385.0 | 25.2 | 0.881 ± 0.020 |
-| Gradient Boosting | 0.834 | 410.0 | 29.6 | 0.875 ± 0.017 |
-| XGBoost | 0.799 | 451.7 | 41.3 | 0.876 ± 0.015 |
-| Decision Tree | 0.776 | 477.1 | 39.4 | 0.787 ± 0.017 |
-| Ridge Regression | 0.749 | 505.2 | 61.2 | 0.787 ± 0.039 |
-| Lasso Regression | 0.748 | 506.2 | 60.6 | 0.787 ± 0.039 |
-| Linear Regression | 0.747 | 506.4 | 61.5 | 0.787 ± 0.039 |
-| K-Nearest Neighbours | 0.742 | 511.5 | 42.9 | 0.825 ± 0.034 |
-| AdaBoost | 0.498 | 714.1 | 237.7 | -3.47 ± 4.48 |
+> **Genuine finding, not an error**: AdaBoost produced a **negative cross-validated R² (-3.47)**, meaning its default weak learners and loss weighting are poorly suited to this heavy-tailed, high-cardinality regression target. It was tested per the assignment's algorithm list but correctly not selected — models were chosen for suitability, not to force a particular result.
 
-**AdaBoost failed badly** (negative CV R²) — a genuine finding, not an error: its default weak
-learners and loss weighting are not well suited to this heavy-tailed, high-cardinality
-regression target. It was tested (per the assignment's algorithm list) but correctly not selected.
+---
 
-### Hyperparameter Tuning (`src/hyperparameter_tuning.py`)
-`RandomizedSearchCV` (3-fold CV, training data only) was run on the two strongest baseline
-models. **Neither tuned configuration beat the untuned LightGBM baseline** on the held-out test
-set (see `reports/tuned_model_comparison.csv`) — the pipeline automatically keeps whichever
-model performs best, so the baseline LightGBM was retained as final. This is reported honestly
-rather than forcing an "improvement" that wasn't real.
+## 🔧 Hyperparameter Tuning Approach
 
-### Final Model: **LightGBM**
-- Test R² = 0.855, Test RMSE = 384.2, Test MAE = 30.6
-- Train R² = 0.963 → moderate train/test gap (~0.11), acceptable for a gradient-boosted model
-  on this data
-- Feature importance confirms `Historical_Yield` / `Historical_Yield_Avg3` dominate, followed by
-  `Crop` and `District_Name` category effects
+We tuned the top two performing models (LightGBM and Random Forest) using `RandomizedSearchCV` with 3-fold cross-validation on the training dataset only.
 
-## 5. Key EDA Insights
-- `Historical_Yield` correlates strongly with the target (r ≈ 0.90) — past performance is the
-  single strongest predictor of future yield.
-- Raw cultivated `Area` alone has almost no linear relationship with yield — efficiency, not
-  scale, drives yield.
-- Coconut and the "Whole Year" season show very high yield values because some crops are
-  recorded in count units (e.g. nuts) rather than tonnes in the source data — a labeling quirk
-  worth flagging to stakeholders, not a data error to silently "fix".
+### Tuned Parameters:
+* **LightGBM**:
+  * `model__n_estimators`: `[150, 250, 350]`
+  * `model__num_leaves`: `[15, 31, 63]`
+  * `model__max_depth`: `[4, 6, 8, -1]`
+  * `model__learning_rate`: `[0.03, 0.05, 0.08, 0.1]`
+  * `model__subsample` / `model__colsample_bytree`: `[0.7, 0.85, 1.0]`
+* **Random Forest**:
+  * `model__n_estimators`: `[100, 150, 250]`
+  * `model__max_depth`: `[10, 14, 18, None]`
+  * `model__min_samples_split`: `[2, 5, 10]`
+  * `model__min_samples_leaf`: `[1, 2, 4]`
+  * `model__max_features`: `["sqrt", "log2", 0.6]`
 
-## 6. Responsible AI & Ethical Considerations
-- **Sensitive data:** none — only aggregated, public agricultural statistics.
-- **Bias check:** mean absolute error varies by state (see `reports/error_by_state.csv`),
-  largely driven by how many historical records exist per state — disclosed rather than hidden.
-- **Fairness:** predictions are a planning aid, not a certified yield guarantee, and should not
-  be used to unilaterally deny support to any district.
-- Predictions are explicitly labeled as estimates in the dashboard.
+> **Honest outcome**: Neither tuned configuration beat the untuned baseline LightGBM (Test R² 0.855) on the held-out test set. The pipeline automatically keeps whichever model performs best, so the **baseline LightGBM was retained as the final model** — reported as-is rather than forcing an "improvement" that wasn't real.
 
-## 7. Limitations & Future Improvements
-- Heavily reliant on historical yield for the same combination; new combinations fall back to a
-  crop-level average and are less reliable.
-- Crops recorded in non-tonne units (e.g. coconut) should be modeled separately or unit-normalised.
-- Future work: incorporate rainfall/weather and soil data, separate modeling for unit-mismatched
-  crops, and quantile regression for prediction intervals.
+---
 
-## 8. How to Run
+## 🏆 Final Model Performance & Evaluation
 
-### Install dependencies
+The **LightGBM Regressor** emerged as the best-performing model.
+
+### Key Metrics (on Test Set, years 2012–2014):
+* **R² Score**: `0.855` (The model explains 85.5% of the variance in crop yield on unseen future years).
+* **Mean Absolute Error (MAE)**: `30.56` (average tonnes/hectare-equivalent prediction error).
+* **Root Mean Squared Error (RMSE)**: `384.19`
+
+### Overfitting & Stability Check:
+* **Training R² Score**: `0.963`
+* **Testing R² Score**: `0.855`
+* **Generalization Score Difference (Overfit Gap)**: `0.108` (moderate but acceptable for a gradient-boosted model on this heavy-tailed data).
+* **3-Fold Cross Validation Average R²**: `0.861` (Standard Deviation: `0.032`), confirming reasonable stability across folds.
+
+### Interpretation:
+Aggregated feature importance confirms `Area_log`, `Historical_Yield`, and `Years_Since_Start` dominate — past performance and field scale are the strongest signals, echoing the EDA correlation findings.
+
+---
+
+## 🖥️ Streamlit Dashboard Demo
+
+An interactive dashboard was developed using Streamlit (`dashboard/app.py`) featuring:
+1. **Overview Tab**: Key metrics, actual-vs-predicted scatter plot, and aggregated feature importance.
+2. **EDA Tab**: Interactive Plotly charts — yield distribution, season/state averages, top-yielding crops.
+3. **Model Comparison Tab**: Full metrics table and bar chart benchmarking all 10 tested models.
+4. **Predict Yield Tab**: Interactive predictor — select state, district, crop, season, year, and cultivated area to get a live yield estimate, historical context, and a productivity band (High/Low).
+5. **District Rankings Tab**: Adjustable top/bottom-N view of high- and low-productivity districts, plus a full sortable ranking table.
+
+---
+
+## 💡 Business Interpretation & Recommendations
+
+* **Prioritize Historical Track Record**: `Historical_Yield` is the single largest contributor to predictions. Planners should weight a district-crop-season's recent track record heavily when forecasting the coming season.
+* **Scale Isn't Everything**: Cultivated `Area` alone barely correlates with yield — larger fields do not automatically mean higher yield-per-hectare. Efficiency-focused interventions (irrigation, soil quality, timing) matter more than expanding acreage.
+* **Target Low-Productivity Districts Early**: Districts like Bilaspur (Chhattisgarh) and Lakhisarai (Bihar) consistently rank at the bottom of actual yield — these are strong candidates for proactive subsidy or extension-service targeting rather than reactive support after a poor season.
+* **Flag High-Yield-Unit Crops Separately**: Coconut and similar crops recorded in count units (not tonnes) inflate a few districts' averages — a labeling quirk to flag to stakeholders rather than treat as genuinely exceptional performance.
+
+---
+
+## ⚠️ Model Limitations & Responsible AI
+
+* **Relies Heavily on Historical Continuity**: Genuinely new district-crop-season combinations (no prior history) fall back to a crop-level average and are less reliable than combinations with an established track record.
+* **Unit Mismatches in Source Data**: Some crops (e.g. coconut) are recorded in count units (nuts) rather than tonnes in the source dataset, inflating yield figures for a handful of districts — these should be modeled separately in a production system.
+* **No Weather or Soil Data**: The model does not currently incorporate rainfall, temperature, or soil-quality data, which are known drivers of yield variance not captured by historical performance alone.
+* **Sensitive Data**: None — only aggregated, public agricultural statistics are used; no personally identifiable information is present.
+* **Bias Check**: Mean absolute error varies by state, largely driven by how many historical records exist per state — this is disclosed transparently (`reports/error_by_state.csv`) rather than hidden.
+* **Not a Guarantee**: Predictions are a planning aid, not a certified yield outcome, and should never be used to unilaterally deny support to any district.
+
+---
+
+## 🚀 Installation & Execution Instructions
+
+### Prerequisites
+* Python 3.10+
+* Git (optional)
+
+### Step 1: Clone or Download the Project
+Make sure the folder contains:
+* `data/raw/crop_yield_dataset.csv`
+* `src/` (all pipeline scripts)
+* `dashboard/app.py`
+* `requirements.txt`
+
+### Step 2: Install Dependencies
+Open your terminal in the project directory and run:
 ```bash
 pip install -r requirements.txt
 ```
 
-### Run the full pipeline (preprocessing → EDA → training → tuning → evaluation)
+### Step 3: Run Model Training & Generate Artifacts
+Run the full pipeline to generate the cleaned data, models, and evaluation metrics:
 ```bash
 cd src
 python run_pipeline.py
 ```
-Or run each step individually: `preprocessing.py`, `feature_engineering.py`, `eda.py`,
-`train_models.py`, `hyperparameter_tuning.py`, `evaluate_and_interpret.py`.
+This script runs preprocessing → feature engineering → EDA → model training & comparison → hyperparameter tuning → evaluation & interpretation, and saves results in the `models/` and `reports/` folders.
 
-### Open the analysis notebook
-```bash
-jupyter notebook notebooks/Crop_Yield_Capstone.ipynb
-```
-(Already executed — all outputs and charts are saved inline; re-running is optional.)
-
-### Launch the interactive dashboard
+### Step 4: Launch the Streamlit Dashboard
+Launch the interactive web-based analytics dashboard:
 ```bash
 streamlit run dashboard/app.py
 ```
-Then open the URL shown in the terminal (typically http://localhost:8501). The dashboard
-includes: an overview with actual-vs-predicted and feature importance, an EDA explorer, a full
-model comparison table/chart, a live yield predictor (pick state/district/crop/season/year/area),
-and high/low-productivity district rankings.
+A browser tab should open automatically. If not, open the URL printed in the terminal (usually `http://localhost:8501`).
 
-## 9. Deliverables Checklist
-- [x] Public GitHub-ready repository structure
-- [x] Complete, already-executed Jupyter Notebook (`notebooks/Crop_Yield_Capstone.ipynb`)
-- [x] Cleaned, model-ready dataset (`data/processed/`)
-- [x] EDA with 7+ visualisations (`reports/figures/`)
-- [x] Feature engineering & preprocessing pipeline (`src/feature_engineering.py`, sklearn Pipeline)
-- [x] Comparison of 10 ML models (`reports/model_comparison.csv`)
-- [x] Hyperparameter tuning results (`reports/tuned_model_comparison.csv`)
-- [x] Final model evaluation (R², RMSE, MAE, MAPE, overfitting check)
-- [x] Actual-vs-predicted visualisation (`reports/figures/08_actual_vs_predicted.png`)
-- [x] Interactive Streamlit dashboard (`dashboard/app.py`)
-- [x] This README
-- [x] `requirements.txt`
-- [x] Written project report (`deliverables/report.pdf`)
-- [x] Slide presentation (`deliverables/CropYieldPrediction_Presentation.pptx`)
-- [ ] Live hosted demo — deploy yourself in ~2 min via `DEPLOYMENT.md` (requires your own
-      GitHub + Streamlit Cloud account)
-
-## 10. Credits & References
-- Dataset: Government of India Open Data Platform — District-wise, Season-wise Crop
-  Production Statistics.
-- Built with: pandas, scikit-learn, XGBoost, LightGBM, matplotlib, seaborn, Plotly, Streamlit.
-
----
-*This project was built as part of a Machine Learning Capstone exercise covering the full ML
-lifecycle: business framing, data collection, cleaning, EDA, feature engineering, model
-comparison, hyperparameter tuning, evaluation/interpretation, responsible AI review, and
-deployment-ready dashboarding.*
+**Or skip local setup entirely** and try the hosted version: **[cropyieldpredictionapp-2020.streamlit.app](https://cropyieldpredictionapp-2020.streamlit.app/)**
