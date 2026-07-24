@@ -1,0 +1,16 @@
+State_Name,District_Name,Crop,Season,Crop_Year,Area,Yield_Target,Predicted_Yield
+Chhattisgarh,DANTEWADA,Wheat,Rabi,2014,5.0,2.4,2.16
+Arunachal Pradesh,LOWER SUBANSIRI,Dry ginger,Whole Year,2014,279.0,4.92,6.08
+Bihar,VAISHALI,Peas & beans (Pulses),Rabi,2013,11.0,1.09,1.0
+Arunachal Pradesh,UPPER SUBANSIRI,Small millets,Kharif,2014,1787.0,1.3,1.3
+Bihar,SHEOHAR,Maize,Rabi,2014,1436.0,3.38,2.59
+Assam,NAGAON,Masoor,Rabi,2014,1012.0,0.61,0.46
+Andhra Pradesh,PRAKASAM,Turmeric,Kharif,2013,762.0,6.66,7.28
+Arunachal Pradesh,TIRAP,Rice,Kharif,2012,5080.0,0.88,0.8
+Chhattisgarh,BALRAMPUR,Sweet potato,Whole Year,2014,427.0,4.79,5.26
+Assam,MARIGAON,Moong(Green Gram),Rabi,2013,494.0,0.35,0.55
+Chhattisgarh,BALRAMPUR,Rapeseed &Mustard,Rabi,2012,8342.0,0.55,0.58
+Arunachal Pradesh,NAMSAI,Potato,Whole Year,2014,119.0,6.67,7.73
+Andhra Pradesh,CHITTOOR,Moong(Green Gram),Kharif,2012,389.0,0.55,0.52
+Bihar,MADHEPURA,Sugarcane,Whole Year,2013,385.0,57.22,54.61
+Bihar,SAHARSA,Ragi,Kharif,2014,253.0,1.98,0.85
